@@ -1,13 +1,13 @@
 # Todo App with CI/CD
 
-A simple todo application with Flask, MySQL, Nginx, and GitHub Actions CI/CD.
+A simple todo application with Flask, MySQL, Nginx, and CI/CD using Jenkins
 
 ## Setup instructions
 
 ```bash
 # Clone and start with Docker Compose
 git clone this_repo
-cd todo-app-ci
+cd todo-app-cicd
 docker-compose up --build
 ```
 
@@ -16,34 +16,43 @@ The app will be available at `http://localhost`
 ## Project Structure
 
 ```
-.
-├── web/                # Flask app, tests
+├── web/                # Flask app, tests, requirements
 ├── nginx/              # Reverse proxy config
-├── db/                 # Database schema
-├── docker-compose.yml  # Multi-container setup
-└── .github/workflows/  # CI/CD pipelines
+├── db/                 # Database schema (init.sql)
+├── docker-compose.yml  # 3-service stack (MySQL, Flask, Nginx)
+├── .gitignore          # Python + CI workflow ignores
+└── README.md           # This file
 ```
 
 ## API Endpoints
 
+- `GET /` - Web interface with add task form
 - `GET /health` - Health check
-- `GET /` - Web interface
-- `POST /add` - Add task (JSON): `{"task": "..."}`
-- `GET /list` - Get all tasks
-- `GET /delete/<id>` - Delete task
-- `POST /add_from_browser` - Add via form
+- `POST /add` - Add task (JSON: `{"task": "..."}`)
+- `GET /tasks` - Get all tasks with pagination
+- `GET /list` - Get all tasks as HTML
+- `POST/GET /complete/<id>` - Mark task complete
+- `POST/GET /delete/<id>` - Delete task
 
 ## CI/CD Pipelines
 
-1. Python Test Job
-   - Black formatting check
-   - flake8 linting
-   - pytest with >80% code coverage
-   - Uploads coverage reports
-   - Triggered on push/PR to main
+- Unit tests with mocked database (36 tests)
+- Integration tests with real MySQL database
+- 81% code coverage validation
+- Docker image build and validation
 
-2. Docker Build Job
-   - Runs after Python tests pass
-   - Dockerfile syntax validation
-   - Docker image build and test
-   - Triggered on push/PR to main
+## Testing
+
+```bash
+# Run all tests (36 tests, 81% coverage)
+docker-compose exec web pytest test_app.py -v
+
+# Run with coverage report
+docker-compose exec web pytest test_app.py --cov=app --cov-report=term-missing
+
+# Run only unit tests (mocked DB)
+docker-compose exec web pytest test_app.py -m "not integration"
+
+# Run only integration tests (real DB)
+docker-compose exec web pytest test_app.py -m "integration"
+```
