@@ -1,7 +1,9 @@
 import os
 import logging
-from flask import Flask, request
+from contextlib import contextmanager
+from flask import Flask, request, jsonify
 import mysql.connector
+from mysql.connector import Error as MySQLError
 
 # logging
 log_dir = "/app/logs"
@@ -22,18 +24,53 @@ logging.basicConfig(
 app = Flask(__name__)
 
 
-def db():
-    # environment variables for database connection
-    return mysql.connector.connect(
-        host=os.environ["DB_HOST"],
-        user=os.environ["DB_USER"],
-        password=os.environ["DB_PASSWORD"],
-        database=os.environ["DB_NAME"],
-    )
+def get_db_connection():
+    """Create and return a MySQL connection"""
+    try:
+        return mysql.connector.connect(
+            host=os.environ["DB_HOST"],
+            user=os.environ["DB_USER"],
+            password=os.environ["DB_PASSWORD"],
+            database=os.environ["DB_NAME"],
+        )
+    except MySQLError as e:
+        logging.error(f"Database connection failed: {e}")
+        raise
+
+
+@contextmanager
+def get_db():
+    """Context manager for safe database connections and transactions"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        yield conn
+        conn.commit()
+    except MySQLError as e:
+        if conn:
+            conn.rollback()
+        logging.error(f"Database error: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+def validate_task(task):
+    """Validate task input"""
+    if not task or not isinstance(task, str):
+        raise ValueError("Task must be a non-empty string")
+    task = task.strip()
+    if not task:
+        raise ValueError("Task cannot be empty or whitespace only")
+    if len(task) > 255:
+        raise ValueError("Task must be 255 characters or less")
+    return task
 
 
 @app.route("/")
 def index():
+    """Render home page with add task form"""
     logging.info("Index page accessed")
     return """
         <h1>Todo API</h1>
@@ -46,67 +83,243 @@ def index():
     """
 
 
-# helper route to add elements form the browser
-@app.route("/add_from_browser", methods=["POST"])
-def add_from_browser():
-    t = request.form.get("task")
-    c = db()
-    cur = c.cursor()
-    cur.execute("INSERT INTO todos (task) VALUES (%s)", (t,))
-    c.commit()
-    c.close()
-    return f'Added "{t}"! <a href="/">Go back</a>'
-
-
-# health check
 @app.route("/health")
 def health():
-    return "ok"
+    """Health check endpoint"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        logging.error(f"Health check failed: {e}")
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
 
 
-# endpoint to add
 @app.route("/add", methods=["POST"])
 def add():
-    t = request.json["task"]
-    c = db()
-    cur = c.cursor()
-    cur.execute("INSERT INTO todos (task) VALUES (%s)", (t,))
-    c.commit()
-    c.close()
-    return "added"
+    """API endpoint to add a task (JSON)"""
+    try:
+        try:
+            data = request.get_json()
+        except Exception:
+            return jsonify({"error": "Request body must be JSON"}), 400
+
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+
+        task = data.get("task")
+        task = validate_task(task)
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todos (task, status) VALUES (%s, %s)",
+                (task, "pending")
+            )
+            task_id = cursor.lastrowid
+
+        logging.info(f"Task added: {task_id}")
+        return jsonify({
+            "message": "Task added successfully",
+            "task_id": task_id,
+            "task": task,
+            "status": "pending"
+        }), 201
+
+    except ValueError as e:
+        logging.warning(f"Validation error: {e}")
+        return jsonify({"error": str(e)}), 400
+    except MySQLError as e:
+        logging.error(f"Database error in /add: {e}")
+        return jsonify({"error": "Database error"}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /add: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
-# endpoint to view records
+@app.route("/add_from_browser", methods=["POST"])
+def add_from_browser():
+    """Browser form endpoint to add a task"""
+    try:
+        task = request.form.get("task")
+        task = validate_task(task)
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO todos (task, status) VALUES (%s, %s)",
+                (task, "pending")
+            )
+
+        logging.info(f"Task added from browser: {task}")
+        return f'<h2>Added "{task}"!</h2> <a href="/">Go back</a>'
+
+    except ValueError as e:
+        logging.warning(f"Validation error: {e}")
+        return f'<h2>Error: {str(e)}</h2> <a href="/">Go back</a>', 400
+    except MySQLError as e:
+        logging.error(f"Database error in /add_from_browser: {e}")
+        return "<h2>Database error occurred</h2> <a href=\"/\">Go back</a>", 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /add_from_browser: {e}")
+        return "<h2>An error occurred</h2> <a href=\"/\">Go back</a>", 500
+
+
 @app.route("/list")
 def list_all():
-    c = db()
-    cur = c.cursor()
-    cur.execute("SELECT * FROM todos")
-    r = cur.fetchall()
-    c.close()
-    html = """
-        <h1>Todo List</h1>
-        <table border="1" cellpadding="10">
-            <tr><th>ID</th><th>Task</th><th>Action</th></tr>
-    """
-    for task in r:
-        html += f"<tr><td>{task[0]}</td><td>{task[1]}</td><td><a href='/delete/{task[0]}'>Delete</a></td></tr>"
-    html += """
-        </table>
-        <br><a href="/"><button>Back</button></a>
-    """
-    return html
+    """Get all tasks (HTML view)"""
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, task, status FROM todos")
+            tasks = cursor.fetchall()
+
+        html = """
+            <h1>Todo List</h1>
+            <table border="1" cellpadding="10">
+                <tr><th>ID</th><th>Task</th><th>Status</th><th>Actions</th></tr>
+        """
+        for task_id, task_text, status in tasks:
+            action_buttons = f'<a href="/delete/{task_id}">Delete</a>'
+            if status == "pending":
+                action_buttons += f' | <a href="/complete/{task_id}">Mark Complete</a>'
+            html += f"<tr><td>{task_id}</td><td>{task_text}</td><td>{status}</td><td>{action_buttons}</td></tr>"
+
+        html += """
+            </table>
+            <br><a href="/"><button>Back</button></a>
+        """
+        return html
+
+    except MySQLError as e:
+        logging.error(f"Database error in /list: {e}")
+        return "<h2>Database error occurred</h2>", 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /list: {e}")
+        return "<h2>An error occurred</h2>", 500
 
 
-# endpoint to delete
-@app.route("/delete/<int:i>")
-def delete(i):
-    c = db()
-    cur = c.cursor()
-    cur.execute("DELETE FROM todos WHERE id=%s", (i,))
-    c.commit()
-    c.close()
-    return "deleted"
+@app.route("/tasks", methods=["GET"])
+def get_tasks_api():
+    """API endpoint to get all tasks (JSON) - Returns all tasks with pagination support"""
+    try:
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        status_filter = request.args.get("status", type=str)
+
+        if page < 1 or per_page < 1 or per_page > 100:
+            return jsonify({"error": "Invalid pagination parameters"}), 400
+
+        offset = (page - 1) * per_page
+
+        with get_db() as conn:
+            cursor = conn.cursor(dictionary=True)
+
+            # Build query based on filters
+            query = "SELECT id, task, status FROM todos"
+            params = []
+            if status_filter:
+                query += " WHERE status = %s"
+                params.append(status_filter)
+
+            query += " LIMIT %s OFFSET %s"
+            params.extend([per_page, offset])
+
+            cursor.execute(query, params)
+            tasks = cursor.fetchall()
+
+        logging.info(f"Retrieved {len(tasks)} tasks from page {page}")
+        return jsonify({
+            "page": page,
+            "per_page": per_page,
+            "count": len(tasks),
+            "tasks": tasks
+        }), 200
+
+    except MySQLError as e:
+        logging.error(f"Database error in /tasks: {e}")
+        return jsonify({"error": "Database error"}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /tasks: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/complete/<int:task_id>", methods=["POST", "GET"])
+def complete_task(task_id):
+    """Mark a task as completed"""
+    try:
+        if task_id < 1:
+            return jsonify({"error": "Invalid task ID"}), 400
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            # Check if task exists
+            cursor.execute("SELECT id FROM todos WHERE id = %s", (task_id,))
+            if not cursor.fetchone():
+                return jsonify({"error": "Task not found"}), 404
+
+            # Update task status
+            cursor.execute(
+                "UPDATE todos SET status = %s WHERE id = %s",
+                ("completed", task_id)
+            )
+
+        logging.info(f"Task marked complete: {task_id}")
+        if request.method == "GET":
+            return f'<h2>Task marked complete!</h2> <a href="/list">Back to list</a>'
+        return jsonify({"message": "Task marked complete", "task_id": task_id}), 200
+
+    except MySQLError as e:
+        logging.error(f"Database error in /complete: {e}")
+        return jsonify({"error": "Database error"}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /complete: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/delete/<int:task_id>", methods=["POST", "GET"])
+def delete(task_id):
+    """Delete a task by ID"""
+    try:
+        if task_id < 1:
+            return jsonify({"error": "Invalid task ID"}), 400
+
+        with get_db() as conn:
+            cursor = conn.cursor()
+            # Check if task exists
+            cursor.execute("SELECT id FROM todos WHERE id = %s", (task_id,))
+            if not cursor.fetchone():
+                return jsonify({"error": "Task not found"}), 404
+
+            # Delete task
+            cursor.execute("DELETE FROM todos WHERE id = %s", (task_id,))
+
+        logging.info(f"Task deleted: {task_id}")
+        if request.method == "GET":
+            return f'<h2>Task deleted!</h2> <a href="/list">Back to list</a>'
+        return jsonify({"message": "Task deleted", "task_id": task_id}), 200
+
+    except MySQLError as e:
+        logging.error(f"Database error in /delete: {e}")
+        return jsonify({"error": "Database error"}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error in /delete: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors"""
+    return jsonify({"error": "Endpoint not found"}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 errors"""
+    logging.error(f"Internal server error: {error}")
+    return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
