@@ -3,6 +3,7 @@ pipeline {
     
     environment {
         DOCKER_IMAGE = "todo-app:${BUILD_NUMBER}"
+        PATH = "/opt/homebrew/bin:${PATH}"
     }
     
     stages {
@@ -18,8 +19,8 @@ pipeline {
                 echo "Running unit tests"
                 sh '''
                     cd web
-                    pip install -r requirements.txt
-                    pytest test_app.py -v -m "not integration" --cov=app
+                    python3 -m pip install -r requirements.txt
+                    python3 -m pytest test_app.py -v -m "not integration" --cov=app
                 '''
             }
         }
@@ -32,7 +33,7 @@ pipeline {
                     # Start MySQL for integration tests
                     docker-compose up -d db
                     sleep 10
-                    pytest test_app.py -v -m "integration"
+                    python3 -m pytest test_app.py -v -m "integration"
                 '''
             }
         }
@@ -42,9 +43,9 @@ pipeline {
                 echo "Running code quality checks"
                 sh '''
                     cd web
-                    pip install flake8 black
-                    black --check .
-                    flake8 . --max-line-length=127
+                    python3 -m pip install flake8 black
+                    python3 -m black --check .
+                    python3 -m flake8 . --max-line-length=127
                 '''
             }
         }
