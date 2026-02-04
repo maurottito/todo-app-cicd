@@ -14,13 +14,26 @@ pipeline {
             }
         }
         
+        stage('Setup') {
+            steps {
+                echo "Setting up virtual environment"
+                sh '''
+                    cd web
+                    python3 -m venv venv
+                    source venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+        
         stage('Unit Tests') {
             steps {
                 echo "Running unit tests"
                 sh '''
                     cd web
-                    python3 -m pip install -r requirements.txt
-                    python3 -m pytest test_app.py -v -m "not integration" --cov=app
+                    source venv/bin/activate
+                    pytest test_app.py -v -m "not integration" --cov=app
                 '''
             }
         }
@@ -30,10 +43,11 @@ pipeline {
                 echo "Running integration tests"
                 sh '''
                     cd web
+                    source venv/bin/activate
                     # Start MySQL for integration tests
                     docker-compose up -d db
                     sleep 10
-                    python3 -m pytest test_app.py -v -m "integration"
+                    pytest test_app.py -v -m "integration"
                 '''
             }
         }
@@ -43,9 +57,10 @@ pipeline {
                 echo "Running code quality checks"
                 sh '''
                     cd web
-                    python3 -m pip install flake8 black
-                    python3 -m black --check .
-                    python3 -m flake8 . --max-line-length=127
+                    source venv/bin/activate
+                    pip install flake8 black
+                    black --check .
+                    flake8 . --max-line-length=127
                 '''
             }
         }
