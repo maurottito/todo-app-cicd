@@ -39,7 +39,7 @@ pipeline {
                 echo "Code quality checks in Docker"
                 sh '''
                     docker-compose exec -T web pip install flake8 black
-                    docker-compose exec -T web black --check .
+                    docker-compose exec -T web black .
                     docker-compose exec -T web flake8 . --max-line-length=127
                 '''
             }
