@@ -17,7 +17,8 @@ pipeline {
             steps {
                 echo "Running unit tests in Docker"
                 sh '''
-                    docker-compose up -d
+                    docker-compose down -v
+                    docker-compose up -d db web
                     sleep 15
                     docker-compose exec -T web pytest test_app.py -v -m "not integration" --cov=app
                 '''
