@@ -10,7 +10,7 @@ log_dir = "/app/logs"
 try:
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-except PermissionError:
+except (PermissionError, OSError):
     log_dir = "/tmp/logs"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
