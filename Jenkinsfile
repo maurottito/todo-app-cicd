@@ -18,7 +18,7 @@ pipeline {
                 echo "Running unit tests in Docker"
                 sh '''
                     docker-compose down -v
-                    docker-compose up -d db web
+                    docker-compose up -d
                     sleep 15
                     docker-compose exec -T web pytest test_app.py -v -m "not integration" --cov=app
                 '''
@@ -39,8 +39,8 @@ pipeline {
                 echo "Code quality checks in Docker"
                 sh '''
                     docker-compose exec -T web pip install flake8 black
-                    docker-compose exec -T web black --check web/
-                    docker-compose exec -T web flake8 web/ --max-line-length=127
+                    docker-compose exec -T web black --check .
+                    docker-compose exec -T web flake8 . --max-line-length=127
                 '''
             }
         }
