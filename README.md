@@ -56,4 +56,3 @@ docker-compose exec web pytest test_app.py -m "not integration"
 # Run only integration tests (real DB)
 docker-compose exec web pytest test_app.py -m "integration"
 ```
-# Webhook test - Wed Feb  4 21:39:32 CST 2026
