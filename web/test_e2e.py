@@ -20,7 +20,7 @@ def test_complete_user_journey():
     response = requests.post(
         f"{base_url}/add",
         json={"task": task_name},
-        headers={"Content-Type": "application/json"}
+        headers={"Content-Type": "application/json"},
     )
     assert response.status_code in [200, 201]
     response_data = response.json()
