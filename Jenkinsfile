@@ -5,11 +5,17 @@ pipeline {
         DOCKER_IMAGE = "todo-app-cicd:${BUILD_NUMBER}"
     }
     
+    // Webhook triggers
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
     stages {
         stage('Checkout') {
             agent { label 'docker' }
             steps {
                 echo "Checking out code on agent with 'docker' label"
+                echo "Branch: ${env.BRANCH_NAME}"
                 checkout scm
             }
         }
@@ -51,9 +57,12 @@ pipeline {
         }
         
         stage('Build Docker Image') {
+            when {
+                branch 'main'
+            }
             agent { label 'build' }
             steps {
-                echo "Building Docker image on agent with 'build' label"
+                echo "Building Docker image on agent with 'build' label (MAIN BRANCH ONLY)"
                 sh '''
                     docker build -t ${DOCKER_IMAGE} -f web/Dockerfile web/
                     docker tag ${DOCKER_IMAGE} todo-app-cicd:latest
@@ -62,9 +71,12 @@ pipeline {
         }
         
         stage('Deploy') {
+            when {
+                branch 'main'
+            }
             agent { label 'deployment' }
             steps {
-                echo "Deploying application on agent with 'deployment' label"
+                echo "Deploying application on agent with 'deployment' label (MAIN BRANCH ONLY)"
                 sh '''
                     echo "Docker image ${DOCKER_IMAGE} ready for deployment"
                     echo "Tagged as todo-app-cicd:latest"
@@ -82,10 +94,10 @@ pipeline {
             }
         }
         success {
-            echo "Pipeline succeeded"
+            echo "Pipeline succeeded for branch: ${env.BRANCH_NAME}"
         }
         failure {
-            echo "Pipeline failed"
+            echo "Pipeline failed for branch: ${env.BRANCH_NAME}"
         }
     }
 }
