@@ -3,6 +3,8 @@ pipeline {
     
     environment {
         DOCKER_IMAGE = "todo-app-cicd:${BUILD_NUMBER}"
+        VERSION = "${BUILD_NUMBER}"
+        ARTIFACT_NAME = "todo-app-cicd-v${BUILD_NUMBER}.tar.gz"
     }
     
     // Webhook triggers
@@ -62,11 +64,35 @@ pipeline {
             }
             agent { label 'build' }
             steps {
-                echo "Building Docker image on agent with 'build' label (MAIN BRANCH ONLY)"
+                echo "Building Docker image - Version: v${VERSION}"
                 sh '''
                     docker build -t ${DOCKER_IMAGE} -f web/Dockerfile web/
                     docker tag ${DOCKER_IMAGE} todo-app-cicd:latest
+                    docker tag ${DOCKER_IMAGE} todo-app-cicd:v${VERSION}
                 '''
+            }
+        }
+        
+        stage('Package Artifacts') {
+            when {
+                branch 'main'
+            }
+            agent { label 'build' }
+            steps {
+                echo "Creating versioned artifacts"
+                sh '''
+                    # Package application source
+                    tar -czf ${ARTIFACT_NAME} web/ docker-compose.yml
+                    
+                    # Create build info
+                    echo "Version: v${VERSION}" > build-info.txt
+                    echo "Build: ${BUILD_NUMBER}" >> build-info.txt
+                    echo "Date: $(date)" >> build-info.txt
+                    
+                    ls -lh ${ARTIFACT_NAME}
+                '''
+                archiveArtifacts artifacts: '*.tar.gz, build-info.txt', fingerprint: true
+                echo "Artifacts archived: ${ARTIFACT_NAME}"
             }
         }
         
@@ -76,10 +102,10 @@ pipeline {
             }
             agent { label 'deployment' }
             steps {
-                echo "Deploying application on agent with 'deployment' label (MAIN BRANCH ONLY)"
+                echo "Deploying version: v${VERSION}"
                 sh '''
-                    echo "Docker image ${DOCKER_IMAGE} ready for deployment"
-                    echo "Tagged as todo-app-cicd:latest"
+                    echo "Docker image: ${DOCKER_IMAGE}"
+                    echo "Version: v${VERSION}"
                     docker images | grep todo-app-cicd
                 '''
             }
@@ -94,10 +120,10 @@ pipeline {
             }
         }
         success {
-            echo "Pipeline succeeded for branch: ${env.BRANCH_NAME}"
+            echo "Pipeline succeeded - Version: v${VERSION}"
         }
         failure {
-            echo "Pipeline failed for branch: ${env.BRANCH_NAME}"
+            echo "Pipeline failed"
         }
     }
 }
