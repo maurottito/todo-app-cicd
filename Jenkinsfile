@@ -137,6 +137,7 @@ pipeline {
                 slackSend(
                     color: 'good',
                     message: message,
+                    botUser: True,
                     channel: '#devops-notifications'
                 )
             }
@@ -160,6 +161,7 @@ pipeline {
                 slackSend(
                     color: 'danger',
                     message: message,
+                    botUser: True,
                     channel: '#devops-notifications'
                 )
             }
