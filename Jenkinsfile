@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent none
     
     environment {
         DOCKER_IMAGE = "todo-app:${BUILD_NUMBER}"
@@ -7,15 +7,17 @@ pipeline {
     
     stages {
         stage('Checkout') {
+            agent { label 'docker' }
             steps {
-                echo "Checking out code"
+                echo "Checking out code on agent with 'docker' label"
                 checkout scm
             }
         }
         
         stage('Unit Tests') {
+            agent { label 'testing' }
             steps {
-                echo "Running unit tests in Docker"
+                echo "Running unit tests on agent with 'testing' label"
                 sh '''
                     docker-compose down -v
                     docker-compose build
@@ -27,8 +29,9 @@ pipeline {
         }
         
         stage('Integration Tests') {
+            agent { label 'testing' }
             steps {
-                echo "Running integration tests in Docker"
+                echo "Running integration tests on agent with 'testing' label"
                 sh '''
                     docker-compose exec -T web pytest test_app.py -v -m "integration"
                 '''
@@ -36,8 +39,9 @@ pipeline {
         }
         
         stage('Code Quality') {
+            agent { label 'testing' }
             steps {
-                echo "Code quality checks in Docker"
+                echo "Running code quality checks on agent with 'testing' label"
                 sh '''
                     docker-compose exec -T web pip install flake8 black
                     docker-compose exec -T web black --check .
@@ -47,8 +51,9 @@ pipeline {
         }
         
         stage('Build Docker Image') {
+            agent { label 'build' }
             steps {
-                echo "Building Docker image"
+                echo "Building Docker image on agent with 'build' label"
                 sh '''
                     docker build -t ${DOCKER_IMAGE} -f web/Dockerfile web/
                     docker tag ${DOCKER_IMAGE} todo-app:latest
