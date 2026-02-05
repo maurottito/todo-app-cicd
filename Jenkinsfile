@@ -120,10 +120,49 @@ pipeline {
             }
         }
         success {
-            echo "Pipeline succeeded - Version: v${VERSION}"
+            script {
+                def message = """
+                    :white_check_mark: *Pipeline Success*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Branch:* ${env.BRANCH_NAME}
+                    *Version:* v${VERSION}
+                    *Duration:* ${currentBuild.durationString.replace(' and counting', '')}
+                    *Status:* SUCCESS
+                    <${env.BUILD_URL}|View Build>
+                """.stripIndent()
+                
+                echo "Pipeline succeeded - Version: v${VERSION}"
+                
+                slackSend(
+                    color: 'good',
+                    message: message,
+                    channel: '#devops-notifications'
+                )
+            }
         }
         failure {
-            echo "Pipeline failed"
+            script {
+                def message = """
+                    :x: *Pipeline Failed*
+                    *Job:* ${env.JOB_NAME}
+                    *Build:* #${env.BUILD_NUMBER}
+                    *Branch:* ${env.BRANCH_NAME}
+                    *Version:* v${VERSION}
+                    *Duration:* ${currentBuild.durationString.replace(' and counting', '')}
+                    *Status:* FAILED
+                    *Error:* ${currentBuild.description ?: 'Check build logs for details'}
+                    <${env.BUILD_URL}console|View Console Output>
+                """.stripIndent()
+                
+                echo "Pipeline failed"
+                
+                slackSend(
+                    color: 'danger',
+                    message: message,
+                    channel: '#devops-notifications'
+                )
+            }
         }
     }
 }
