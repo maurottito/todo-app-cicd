@@ -275,7 +275,7 @@ def complete_task(task_id):
 
         logging.info(f"Task marked complete: {task_id}")
         if request.method == "GET":
-            return f'<h2>Task marked complete!</h2> <a href="/list">Back to list</a>'
+            return '<h2>Task marked complete!</h2> <a href="/list">Back to list</a>'
         return jsonify({"message": "Task marked complete", "task_id": task_id}), 200
 
     except MySQLError as e:
@@ -305,7 +305,7 @@ def delete(task_id):
 
         logging.info(f"Task deleted: {task_id}")
         if request.method == "GET":
-            return f'<h2>Task deleted!</h2> <a href="/list">Back to list</a>'
+            return '<h2>Task deleted!</h2> <a href="/list">Back to list</a>'
         return jsonify({"message": "Task deleted", "task_id": task_id}), 200
 
     except MySQLError as e:
