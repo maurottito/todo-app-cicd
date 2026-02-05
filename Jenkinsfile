@@ -18,7 +18,7 @@ pipeline {
                 echo "Running unit tests in Docker"
                 sh '''
                     docker-compose down -v
-                    docker-compose build --no-cache
+                    docker-compose build
                     docker-compose up -d
                     sleep 15
                     docker-compose exec -T web pytest test_app.py -v -m "not integration" --cov=app
@@ -50,7 +50,7 @@ pipeline {
             steps {
                 echo "Building Docker image"
                 sh '''
-                    docker build --no-cache -t ${DOCKER_IMAGE} -f web/Dockerfile web/
+                    docker build -t ${DOCKER_IMAGE} -f web/Dockerfile web/
                     docker tag ${DOCKER_IMAGE} todo-app:latest
                 '''
             }

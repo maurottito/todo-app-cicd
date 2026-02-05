@@ -115,18 +115,22 @@ def add():
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO todos (task, status) VALUES (%s, %s)",
-                (task, "pending")
+                "INSERT INTO todos (task, status) VALUES (%s, %s)", (task, "pending")
             )
             task_id = cursor.lastrowid
 
         logging.info(f"Task added: {task_id}")
-        return jsonify({
-            "message": "Task added successfully",
-            "task_id": task_id,
-            "task": task,
-            "status": "pending"
-        }), 201
+        return (
+            jsonify(
+                {
+                    "message": "Task added successfully",
+                    "task_id": task_id,
+                    "task": task,
+                    "status": "pending",
+                }
+            ),
+            201,
+        )
 
     except ValueError as e:
         logging.warning(f"Validation error: {e}")
@@ -149,8 +153,7 @@ def add_from_browser():
         with get_db() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO todos (task, status) VALUES (%s, %s)",
-                (task, "pending")
+                "INSERT INTO todos (task, status) VALUES (%s, %s)", (task, "pending")
             )
 
         logging.info(f"Task added from browser: {task}")
@@ -161,10 +164,10 @@ def add_from_browser():
         return f'<h2>Error: {str(e)}</h2> <a href="/">Go back</a>', 400
     except MySQLError as e:
         logging.error(f"Database error in /add_from_browser: {e}")
-        return "<h2>Database error occurred</h2> <a href=\"/\">Go back</a>", 500
+        return '<h2>Database error occurred</h2> <a href="/">Go back</a>', 500
     except Exception as e:
         logging.error(f"Unexpected error in /add_from_browser: {e}")
-        return "<h2>An error occurred</h2> <a href=\"/\">Go back</a>", 500
+        return '<h2>An error occurred</h2> <a href="/">Go back</a>', 500
 
 
 @app.route("/list")
@@ -231,12 +234,17 @@ def get_tasks_api():
             tasks = cursor.fetchall()
 
         logging.info(f"Retrieved {len(tasks)} tasks from page {page}")
-        return jsonify({
-            "page": page,
-            "per_page": per_page,
-            "count": len(tasks),
-            "tasks": tasks
-        }), 200
+        return (
+            jsonify(
+                {
+                    "page": page,
+                    "per_page": per_page,
+                    "count": len(tasks),
+                    "tasks": tasks,
+                }
+            ),
+            200,
+        )
 
     except MySQLError as e:
         logging.error(f"Database error in /tasks: {e}")
@@ -262,8 +270,7 @@ def complete_task(task_id):
 
             # Update task status
             cursor.execute(
-                "UPDATE todos SET status = %s WHERE id = %s",
-                ("completed", task_id)
+                "UPDATE todos SET status = %s WHERE id = %s", ("completed", task_id)
             )
 
         logging.info(f"Task marked complete: {task_id}")

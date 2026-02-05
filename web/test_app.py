@@ -166,7 +166,7 @@ class TestListEndpoint:
         mock_connection = MagicMock()
         mock_cursor.fetchall.return_value = [
             (1, "Buy milk", "pending"),
-            (2, "Read book", "completed")
+            (2, "Read book", "completed"),
         ]
         mock_connection.cursor.return_value = mock_cursor
         mock_connection.__enter__ = MagicMock(return_value=mock_connection)
@@ -322,9 +322,14 @@ class TestEndToEndUserJourney:
         cursor = db_session.cursor(dictionary=True)
 
         # Create 2 tasks
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Buy groceries", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)",
+            ("Buy groceries", "pending"),
+        )
         task1_id = cursor.lastrowid
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Read book", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)", ("Read book", "pending")
+        )
         db_session.commit()
 
         # Verify both exist
@@ -332,7 +337,9 @@ class TestEndToEndUserJourney:
         assert cursor.fetchone()["count"] == 2
 
         # Complete and delete first task
-        cursor.execute("UPDATE todos SET status = %s WHERE id = %s", ("completed", task1_id))
+        cursor.execute(
+            "UPDATE todos SET status = %s WHERE id = %s", ("completed", task1_id)
+        )
         cursor.execute("DELETE FROM todos WHERE id = %s", (task1_id,))
         db_session.commit()
 
@@ -346,7 +353,10 @@ class TestEndToEndUserJourney:
         cursor = db_session.cursor(dictionary=True)
 
         for i in range(1, 6):
-            cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", (f"Task {i}", "pending"))
+            cursor.execute(
+                "INSERT INTO todos (task, status) VALUES (%s, %s)",
+                (f"Task {i}", "pending"),
+            )
         db_session.commit()
 
         cursor.execute("SELECT COUNT(*) as count FROM todos")
@@ -357,12 +367,17 @@ class TestEndToEndUserJourney:
         """E2E: Test all status transitions"""
         cursor = db_session.cursor(dictionary=True)
 
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Transition task", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)",
+            ("Transition task", "pending"),
+        )
         task_id = cursor.lastrowid
         db_session.commit()
 
         for status in ["completed", "archived"]:
-            cursor.execute("UPDATE todos SET status = %s WHERE id = %s", (status, task_id))
+            cursor.execute(
+                "UPDATE todos SET status = %s WHERE id = %s", (status, task_id)
+            )
             db_session.commit()
             cursor.execute("SELECT status FROM todos WHERE id = %s", (task_id,))
             assert cursor.fetchone()["status"] == status
@@ -374,11 +389,17 @@ class TestEndToEndUserJourney:
         cursor = db_session.cursor(dictionary=True)
 
         # Create, update, and delete
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 1", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 1", "pending")
+        )
         id1 = cursor.lastrowid
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 2", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 2", "pending")
+        )
         id2 = cursor.lastrowid
-        cursor.execute("INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 3", "pending"))
+        cursor.execute(
+            "INSERT INTO todos (task, status) VALUES (%s, %s)", ("Task 3", "pending")
+        )
         db_session.commit()
 
         cursor.execute("UPDATE todos SET status = %s WHERE id = %s", ("completed", id1))
@@ -388,7 +409,6 @@ class TestEndToEndUserJourney:
         cursor.execute("SELECT COUNT(*) as count FROM todos")
         assert cursor.fetchone()["count"] == 2
         cursor.close()
-
 
 
 class TestBrowserFormEndpoint:
@@ -406,7 +426,10 @@ class TestBrowserFormEndpoint:
 
             response = client.post("/add_from_browser", data={"task": "Browser task"})
             assert response.status_code == 200
-            assert b"Task added successfully" in response.data or b"task" in response.data.lower()
+            assert (
+                b"Task added successfully" in response.data
+                or b"task" in response.data.lower()
+            )
 
     def test_add_from_browser_empty_task(self, client):
         """Test browser form with empty task"""
@@ -425,7 +448,9 @@ class TestErrorHandlingPaths:
     def test_complete_task_db_error(self, client):
         """Test complete endpoint with database error"""
         with patch("app.get_db") as mock_get_db:
-            mock_get_db.return_value.__enter__.side_effect = Exception("DB Connection failed")
+            mock_get_db.return_value.__enter__.side_effect = Exception(
+                "DB Connection failed"
+            )
 
             response = client.post("/complete/1")
             assert response.status_code == 500
@@ -435,7 +460,9 @@ class TestErrorHandlingPaths:
     def test_delete_task_db_error(self, client):
         """Test delete endpoint with database error"""
         with patch("app.get_db") as mock_get_db:
-            mock_get_db.return_value.__enter__.side_effect = Exception("DB Connection failed")
+            mock_get_db.return_value.__enter__.side_effect = Exception(
+                "DB Connection failed"
+            )
 
             response = client.post("/delete/1")
             assert response.status_code == 500
@@ -445,7 +472,9 @@ class TestErrorHandlingPaths:
     def test_list_db_error(self, client):
         """Test list endpoint with database error"""
         with patch("app.get_db") as mock_get_db:
-            mock_get_db.return_value.__enter__.side_effect = Exception("DB Connection failed")
+            mock_get_db.return_value.__enter__.side_effect = Exception(
+                "DB Connection failed"
+            )
 
             response = client.get("/list")
             assert response.status_code == 500
@@ -453,7 +482,9 @@ class TestErrorHandlingPaths:
     def test_tasks_api_db_error(self, client):
         """Test tasks API endpoint with database error"""
         with patch("app.get_db") as mock_get_db:
-            mock_get_db.return_value.__enter__.side_effect = Exception("DB Connection failed")
+            mock_get_db.return_value.__enter__.side_effect = Exception(
+                "DB Connection failed"
+            )
 
             response = client.get("/tasks")
             assert response.status_code == 500
