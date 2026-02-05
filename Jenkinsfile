@@ -2,7 +2,7 @@ pipeline {
     agent none
     
     environment {
-        DOCKER_IMAGE = "todo-app:${BUILD_NUMBER}"
+        DOCKER_IMAGE = "todo-app-cicd:${BUILD_NUMBER}"
     }
     
     stages {
@@ -56,7 +56,19 @@ pipeline {
                 echo "Building Docker image on agent with 'build' label"
                 sh '''
                     docker build -t ${DOCKER_IMAGE} -f web/Dockerfile web/
-                    docker tag ${DOCKER_IMAGE} todo-app:latest
+                    docker tag ${DOCKER_IMAGE} todo-app-cicd:latest
+                '''
+            }
+        }
+        
+        stage('Deploy') {
+            agent { label 'deployment' }
+            steps {
+                echo "Deploying application on agent with 'deployment' label"
+                sh '''
+                    echo "Docker image ${DOCKER_IMAGE} ready for deployment"
+                    echo "Tagged as todo-app-cicd:latest"
+                    docker images | grep todo-app-cicd
                 '''
             }
         }
