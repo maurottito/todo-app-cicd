@@ -40,6 +40,8 @@ The app will be available at `http://localhost`
 - Integration tests with real MySQL database
 - 81% code coverage validation
 - Docker image build and validation
+- End-to-end testing with pytest and requests library
+- Performance testing with k6 (10 VUs, 30s duration, all thresholds passing)
 
 ## Testing
 
