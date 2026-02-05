@@ -18,7 +18,7 @@ The app will be available at `http://localhost`
 ```
 ├── web/                # Flask app, tests, requirements
 ├── nginx/              # Reverse proxy config
-├── db/                 # Database schema (init.sql)
+├── db/                 # Database schema
 ├── docker-compose.yml  # 3-service stack (MySQL, Flask, Nginx)
 ├── .gitignore          # Python + CI workflow ignores
 └── README.md           # This file
